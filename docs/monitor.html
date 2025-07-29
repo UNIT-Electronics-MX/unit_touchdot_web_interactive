@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>TouchDot S3</title>
+  <link rel="icon" href="bluetooth-icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link 
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" 
+    rel="stylesheet"
+  >
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Poppins','sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="font-sans bg-gradient-to-br from-indigo-300 to-blue-900 text-gray-800 min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <nav class="w-full bg-white shadow-md">
+    <div class="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
+      <span class="text-xl font-bold">TouchDot S3</span>
+      <div class="space-x-4">
+        <a href="/docs/micropython.html" class="text-gray-700 hover:text-blue-600 transition font-semibold">Micropython</a>
+        <a href="/docs/" class="text-gray-700 hover:text-blue-600 transition font-semibold">Neopixel</a>
+        <a href="/docs/monitor.html" class="text-gray-700 hover:text-blue-600 transition font-semibold">Serial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contenedor de tarjetas -->
+  <main class="flex-1 flex items-center justify-center p-6">
+    <div class="flex flex-col md:flex-row items-stretch justify-center gap-6">
+
+      <!-- Tarjeta 1 -->
+      <div class="bg-white rounded-2xl shadow-lg p-6 text-center space-y-4 w-full max-w-sm">
+        <h2 class="text-2xl font-bold">TouchDot S3</h2>
+        <img src="img/touchdot_top.jpg" alt="Módulo ESP32-S3" class="mx-auto w-100 h-auto"/>
+        <p class="text-gray-600">Conecta tu TouchDot S3</p>
+        <button
+          id="connect"
+          class="w-full py-3 bg-gradient-to-r from-blue-400 to-blue-800 
+                 hover:from-blue-500 hover:to-blue-900 
+                 text-white font-medium rounded-lg transition"
+        >Conectar dispositivo</button>
+        <p id="status-message" class="text-sm italic text-gray-600"></p>
+      </div>
+
+      
+
+      <!-- Tarjeta 2 -->
+      <div class="bg-white rounded-2xl shadow-lg p-6 text-center space-y-4 w-full max-w-sm">
+        <h2 class="text-2xl font-bold">Monitor serial</h2>
+        <p class="text-gray-600">Enciende o apaga el neopixel integrado</p>
+
+        <div class="flex space-x-2">
+          <button
+            class="flex-1 py-3
+           bg-gradient-to-r from-green-400 to-gray-600
+           hover:from-green-500 hover:to-gray-700
+           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500
+           text-white font-medium rounded-lg transition"
+          >Enviar</button>
+          
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="w-full bg-white shadow-inner py-4">
+    <div class="max-w-6xl mx-auto text-center text-gray-600">
+      © 2025 UNIT Electronics • 
+      <a href="https://github.com/UNIT-Electronics-MX/unit_touchdot_s3/tree/develop" 
+         class="underline hover:text-blue-600">GitHub</a>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
