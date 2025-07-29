@@ -6,20 +6,8 @@
   <link rel="icon" href="bluetooth-icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link 
-    href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" 
-    rel="stylesheet"
-  >
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Poppins','sans-serif'] }
-        }
-      }
-    }
-  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script> tailwind.config = { darkMode: 'class', theme: {extend: { fontFamily: { sans: ['Poppins','sans-serif'] }}}} </script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
@@ -30,9 +18,9 @@
     <div class="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
       <span class="text-xl font-bold">TouchDot S3</span>
       <div class="space-x-4">
-        <a href="/docs/micropython.html" class="text-gray-700 hover:text-blue-600 transition font-semibold">Micropython</a>
-        <a href="/docs/index.html" class="text-gray-700 hover:text-blue-600 transition font-semibold">Neopixel</a>
-        <a href="/docs/monitor.html" class="text-gray-700 hover:text-blue-600 transition font-semibold">Serial</a>
+        <a href="/docs/micropython/micropython.html" class="text-gray-700 hover:text-blue-600 transition font-semibold">Micropython</a>
+        <a href="/docs/neopixel/index.html" class="text-gray-700 hover:text-blue-600 transition font-semibold">Neopixel</a>
+        <a href="/docs/monitor/monitor.html" class="text-gray-700 hover:text-blue-600 transition font-semibold">Serial</a>
       </div>
     </div>
   </nav>
@@ -77,7 +65,6 @@ ble.active(True)
   </p>
 </div>
 
-
     </div>
   </main>
 
@@ -90,21 +77,7 @@ ble.active(True)
     </div>
   </footer>
 
-<script>
-  document.getElementById('copy-btn').addEventListener('click', async () => {
-    const code = document.getElementById('code-block').innerText.trim();
-    try {
-      await navigator.clipboard.writeText(code);
-      const status = document.getElementById('copy-status');
-      status.textContent = '¡Código copiado!';
-      status.classList.remove('invisible');
-      // Opcional: volver a ocultar el mensaje tras 2 s
-      setTimeout(() => status.classList.add('invisible'), 2000);
-    } catch (err) {
-      console.error('Error copiando al portapapeles:', err);
-    }
-  });
-</script>
+<script src="copy.js"></script>
 
 </body>
 </html>
