@@ -112,7 +112,18 @@ class MyServerCallbacks: public BLEServerCallbacks {
       Serial.println("Cliente conectado");
       
       // *** ENVIAR ESTADO INICIAL AL CONECTAR ***
-      delay(1000); // Dar tiempo para que el cliente configure notificaciones
+      delay(1500); // Dar más tiempo para que el cliente configure notificaciones
+      
+      // Enviar estado actual de GPIO9
+      if (pGpioCharacteristic) {
+        String currentGpioState = String(digitalRead(INPUT_PIN));
+        pGpioCharacteristic->setValue(currentGpioState.c_str());
+        pGpioCharacteristic->notify();
+        Serial.printf("� Estado inicial GPIO9 enviado: %s\n", currentGpioState.c_str());
+      }
+      
+      // Pequeña pausa antes de enviar Device Info
+      delay(300);
       
       // Enviar información del dispositivo via característica Sensor
       if (pSensorCharacteristic) {
@@ -122,16 +133,8 @@ class MyServerCallbacks: public BLEServerCallbacks {
         pSensorCharacteristic->setValue(infoMessage.c_str());
         pSensorCharacteristic->notify();
         deviceInfoSent = true;
-        Serial.println("📱 Información del dispositivo enviada:");
+        Serial.println("� Información del dispositivo enviada:");
         Serial.println(deviceInfo);
-      }
-      
-      // Enviar estado actual de GPIO9
-      if (pGpioCharacteristic) {
-        String currentGpioState = String(digitalRead(INPUT_PIN));
-        pGpioCharacteristic->setValue(currentGpioState.c_str());
-        pGpioCharacteristic->notify();
-        Serial.printf("🔧 Estado inicial GPIO9 enviado: %s\n", currentGpioState.c_str());
       }
       
       // Pequeña pausa antes de enviar datos de sensores

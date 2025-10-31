@@ -807,9 +807,12 @@ async function readSensors() {
 function handleSensorNotification(event) {
     const sensorData = new TextDecoder().decode(event.target.value);
     
+    console.log('📊 Sensor data recibido:', sensorData);
+    
     // Verificar si es información del dispositivo
     if (sensorData.startsWith('DEVICE_INFO:')) {
         const deviceInfoJson = sensorData.substring(12); // Quitar el prefijo "DEVICE_INFO:"
+        console.log('✅ DEVICE_INFO detectado! JSON:', deviceInfoJson);
         parseDeviceInfo(deviceInfoJson);
     } else {
         // Es un mensaje normal de sensores
@@ -820,14 +823,15 @@ function handleSensorNotification(event) {
 function parseDeviceInfo(jsonString) {
     try {
         const deviceInfo = JSON.parse(jsonString);
-        console.log('📱 Información del dispositivo recibida:', deviceInfo);
+        console.log('📱 Información del dispositivo parseada:', deviceInfo);
         
         // Mostrar la información en la interfaz
-        displayDeviceInfo(deviceInfo);
+        displayDeviceInfo(jsonString);
         
         addLog(`Dispositivo identificado: ${deviceInfo.deviceName} (${deviceInfo.mac})`, 'success');
     } catch (error) {
         console.error('❌ Error parseando Device Info:', error);
+        console.error('❌ String recibido:', jsonString);
         addLog('Error al procesar información del dispositivo', 'error');
     }
 }
@@ -1419,6 +1423,14 @@ function displayDeviceInfo(deviceInfoJson) {
     try {
         const deviceInfo = JSON.parse(deviceInfoJson);
         
+        console.log('📱 Device Info recibido:', deviceInfo);
+        
+        // Convertir flashSize de bytes a MB
+        const flashSizeMB = deviceInfo.flashSize ? (deviceInfo.flashSize / (1024 * 1024)).toFixed(2) : 'N/A';
+        
+        // Formatear timestamp
+        const timestamp = deviceInfo.timestamp ? new Date(deviceInfo.timestamp).toLocaleString() : new Date().toLocaleString();
+        
         // Crear o actualizar el panel de información del dispositivo
         let deviceInfoPanel = document.getElementById('device-info-panel');
         if (!deviceInfoPanel) {
@@ -1434,35 +1446,36 @@ function displayDeviceInfo(deviceInfoJson) {
             }
         }
         
-        // Actualizar contenido del panel
+        // Actualizar contenido del panel - MAPEO CORRECTO de propiedades del firmware
         deviceInfoPanel.innerHTML = `
             <div class="flex items-center mb-2">
-                <div class="w-3 h-3 bg-blue-400 rounded-full mr-2"></div>
+                <div class="w-3 h-3 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
                 <h3 class="text-lg font-semibold text-blue-800">Información del Dispositivo</h3>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 <div class="space-y-1">
                     <div><span class="font-medium text-gray-700">Dispositivo:</span> <span class="text-blue-700">${deviceInfo.deviceName || 'N/A'}</span></div>
                     <div><span class="font-medium text-gray-700">MAC Address:</span> <span class="font-mono text-green-700">${deviceInfo.mac || 'N/A'}</span></div>
-                    <div><span class="font-medium text-gray-700">Chip ID:</span> <span class="font-mono text-purple-700">${deviceInfo.chipId || 'N/A'}</span></div>
-                    <div><span class="font-medium text-gray-700">Modelo:</span> <span class="text-gray-700">${deviceInfo.chipModel || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">Chip ID:</span> <span class="font-mono text-purple-700">${deviceInfo.chipID || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">Modelo:</span> <span class="text-gray-700">${deviceInfo.model || 'N/A'}</span></div>
                 </div>
                 <div class="space-y-1">
-                    <div><span class="font-medium text-gray-700">Revisión:</span> <span class="text-gray-700">${deviceInfo.chipRevision || 'N/A'}</span></div>
-                    <div><span class="font-medium text-gray-700">Cores:</span> <span class="text-gray-700">${deviceInfo.cpuCores || 'N/A'}</span></div>
-                    <div><span class="font-medium text-gray-700">Flash:</span> <span class="text-gray-700">${deviceInfo.flashSize || 'N/A'} MB</span></div>
-                    <div><span class="font-medium text-gray-700">Firmware:</span> <span class="text-gray-700">v${deviceInfo.firmwareVersion || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">Revisión:</span> <span class="text-gray-700">${deviceInfo.revision || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">Cores:</span> <span class="text-gray-700">${deviceInfo.cores || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">Flash:</span> <span class="text-gray-700">${flashSizeMB} MB</span></div>
+                    <div><span class="font-medium text-gray-700">Firmware:</span> <span class="text-gray-700">v${deviceInfo.firmware || 'N/A'}</span></div>
                 </div>
             </div>
             <div class="mt-2 text-xs text-gray-500">
-                Última actualización: ${deviceInfo.timestamp || new Date().toLocaleString()}
+                Última actualización: ${timestamp}
             </div>
         `;
         
-        addLog(`📱 Dispositivo: ${deviceInfo.deviceName} | MAC: ${deviceInfo.mac}`, 'success');
+        addLog(`📱 Dispositivo: ${deviceInfo.deviceName} | MAC: ${deviceInfo.mac} | Chip: ${deviceInfo.chipID}`, 'success');
         
     } catch (error) {
-        console.error('Error parsing device info:', error);
+        console.error('❌ Error parsing device info:', error);
+        console.error('❌ JSON recibido:', deviceInfoJson);
         addLog('⚠️ Error procesando información del dispositivo', 'warning');
     }
 }
