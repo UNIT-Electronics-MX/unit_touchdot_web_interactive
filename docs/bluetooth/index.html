@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulsar H2 - MicroSD File Viewer</title>
+  <meta name="description" content="Professional interface for Pulsar H2 device - MicroSD file viewing and basic controls">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .status-connected { background-color: #10b981; }
+    .status-connecting { background-color: #f59e0b; animation: pulse 2s infinite; }
+    .status-disconnected { background-color: #ef4444; }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* Collapsible menu styles */
+    #config-content {
+      transition: all 0.3s ease-in-out;
+    }
+    
+    #config-chevron {
+      transition: transform 0.2s ease-in-out;
+    }
+    
+    #config-toggle:hover {
+      background-color: #f9fafb;
+    }
+    
+    /* Hardware status panel styles */
+    .hardware-status-panel {
+      transition: all 0.3s ease;
+    }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      .mobile-compact {
+        padding: 0.5rem;
+      }
+      
+      #config-toggle {
+        padding: 0.75rem;
+      }
+      
+      /* Mobile hardware status - stack vertically */
+      .hardware-status-panel .flex {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      
+      .hardware-status-panel .flex > div {
+        font-size: 0.75rem;
+      }
+    }
+    
+    @media (max-width: 640px) {
+      /* Ultra compact for small screens */
+      .hardware-status-panel .flex {
+        justify-content: center;
+      }
+      
+      .hardware-status-panel h3 {
+        font-size: 0.75rem;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white shadow-sm border-b">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Pulsar H2</h1>
+          <p class="text-sm text-gray-600">MicroSD File Viewer</p>
+        </div>
+        
+        <!-- Connection Status -->
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-2">
+            <span class="status-indicator status-disconnected" id="status-indicator"></span>
+            <span id="connection-status" class="text-sm font-medium text-red-600">Desconectado</span>
+          </div>
+          
+          <!-- Connection Buttons -->
+          <div class="flex space-x-2">
+            <button id="auto-scan-btn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              Auto Scan
+            </button>
+            <button id="connect-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              Conectar
+            </button>
+            <button id="disconnect-btn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors" disabled>
+              Desconectar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hardware Status Panel -->
+  <div class="bg-white shadow-sm border-b hardware-status-panel">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-gray-700">Estado del Hardware Pulsar H2</h3>
+        <div class="flex items-center space-x-4 text-xs">
+          <!-- SPI Status -->
+          <div class="flex items-center space-x-1">
+            <div id="spi-indicator" class="w-2 h-2 bg-gray-400 rounded-full"></div>
+            <span class="text-gray-600">SPI</span>
+            <span id="spi-status" class="font-medium text-gray-500">--</span>
+          </div>
+          
+          <!-- I2C Status -->
+          <div class="flex items-center space-x-1">
+            <div id="i2c-indicator" class="w-2 h-2 bg-gray-400 rounded-full"></div>
+            <span class="text-gray-600">I2C</span>
+            <span id="i2c-status" class="font-medium text-gray-500">--</span>
+          </div>
+          
+          <!-- NeoPixel Status -->
+          <div class="flex items-center space-x-1">
+            <div id="neo-indicator" class="w-2 h-2 bg-gray-400 rounded-full"></div>
+            <span class="text-gray-600">NEO</span>
+            <span id="neo-status" class="font-medium text-gray-500">--</span>
+          </div>
+          
+          <!-- ADC1 Status -->
+          <div class="flex items-center space-x-1">
+            <div id="adc1-indicator" class="w-2 h-2 bg-gray-400 rounded-full"></div>
+            <span class="text-gray-600">ADC1</span>
+            <span id="adc1-status" class="font-medium text-gray-500">--</span>
+          </div>
+          
+          <!-- ADC2 Status -->
+          <div class="flex items-center space-x-1">
+            <div id="adc2-indicator" class="w-2 h-2 bg-gray-400 rounded-full"></div>
+            <span class="text-gray-600">ADC2</span>
+            <span id="adc2-status" class="font-medium text-gray-500">--</span>
+          </div>
+          
+          <!-- GPIO9 Status -->
+          <div class="flex items-center space-x-1">
+            <div id="gpio9-indicator" class="w-2 h-2 bg-gray-400 rounded-full"></div>
+            <span class="text-gray-600">GPIO9</span>
+            <span id="gpio9-hw-status" class="font-medium text-gray-500">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    
+    <!-- Connection Alert -->
+    <div id="connection-alert" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg hidden">
+      <div class="flex items-center">
+        <svg class="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+        </svg>
+        <span class="text-blue-800 text-sm">✅ Conectado a Pulsar H2 - Hardware funcionando correctamente</span>
+      </div>
+    </div>
+
+    <!-- Compact Connection Settings (Collapsible) -->
+    <div class="mb-4 bg-white rounded-lg shadow-sm border">
+      <button id="config-toggle" class="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-gray-50 rounded-lg transition-colors">
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-medium text-gray-800">🔧 Configuración de Conexión</span>
+          <div class="flex items-center space-x-1">
+            <div class="w-2 h-2 bg-green-500 rounded-full" id="auto-reconnect-indicator"></div>
+            <span class="text-xs text-gray-500">Auto-reconexión</span>
+          </div>
+        </div>
+        <svg id="config-chevron" class="w-4 h-4 text-gray-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </button>
+      
+      <div id="config-content" class="px-4 pb-4 border-t border-gray-100" style="display: none;">
+        <!-- Compact Auto-Reconnect Toggle -->
+        <div class="flex items-center justify-between py-3 bg-gray-50 rounded mt-3 px-3">
+          <div>
+            <label class="text-sm font-medium text-gray-700">Reconexión Automática</label>
+            <p class="text-xs text-gray-500">Conectar automáticamente al dispositivo</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="auto-reconnect-toggle" class="sr-only peer" checked>
+            <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+
+        <!-- Compact Devices List -->
+        <div class="mt-3">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Dispositivos Encontrados</h3>
+          <div id="devices-list" class="bg-gray-50 rounded p-3 min-h-[50px] text-sm">
+            <p class="text-gray-500 text-center">No hay dispositivos escaneados</p>
+          </div>
+        </div>
+
+        <!-- Compact Quick Actions -->
+        <div class="flex space-x-2 mt-3">
+          <button id="quick-scan-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
+            🔍 Quick Scan
+          </button>
+          <button id="reconnect-btn" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
+            🔄 Reconectar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Sensor Monitoring -->
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Monitoreo de Sensores</h2>
+        
+        <div class="space-y-4">
+          <!-- GPIO9 Status -->
+          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div class="flex items-center space-x-3">
+              <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+              <span class="text-sm font-medium text-gray-700">GPIO9</span>
+            </div>
+            <span id="gpio9-value" class="text-lg font-semibold text-gray-900">--</span>
+          </div>
+
+          <!-- ADC A2 -->
+          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div class="flex items-center space-x-3">
+              <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+              <span class="text-sm font-medium text-gray-700">ADC A2</span>
+            </div>
+            <span id="adc-a2-value" class="text-lg font-semibold text-gray-900">-- V</span>
+          </div>
+
+          <!-- ADC A3 -->
+          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div class="flex items-center space-x-3">
+              <div class="w-3 h-3 bg-purple-500 rounded-full"></div>
+              <span class="text-sm font-medium text-gray-700">ADC A3</span>
+            </div>
+            <span id="adc-a3-value" class="text-lg font-semibold text-gray-900">-- V</span>
+          </div>
+
+          <button id="read-sensors-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+            Leer Sensores
+          </button>
+        </div>
+      </div>
+
+      <!-- NeoPixel Control -->
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Control NeoPixel</h2>
+        
+        <!-- Color Indicator -->
+        <div class="mb-4 text-center">
+          <div id="neopixel-indicator" class="w-16 h-16 bg-gray-300 rounded-full mx-auto mb-2"></div>
+          <p class="text-sm text-gray-600">Color Actual</p>
+        </div>
+
+        <!-- Color Sliders (Hidden for simple interface) -->
+        <div class="hidden">
+          <div class="space-y-3 mb-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Rojo: <span id="red-value">0</span></label>
+              <input type="range" id="red-slider" min="0" max="255" value="0" class="w-full">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Verde: <span id="green-value">0</span></label>
+              <input type="range" id="green-slider" min="0" max="255" value="0" class="w-full">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Azul: <span id="blue-value">0</span></label>
+              <input type="range" id="blue-slider" min="0" max="255" value="0" class="w-full">
+            </div>
+          </div>
+        </div>
+
+        <!-- Color Buttons -->
+        <div class="grid grid-cols-2 gap-2">
+          <button id="color-red" class="bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+            Rojo
+          </button>
+          <button id="color-green" class="bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+            Verde
+          </button>
+          <button id="color-blue" class="bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+            Azul
+          </button>
+          <button id="color-off" class="bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+            Apagar
+          </button>
+        </div>
+
+        <!-- Additional Colors (Hidden for simple interface) -->
+        <div class="hidden mt-2 grid grid-cols-2 gap-2">
+          <button id="color-yellow" class="bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+            Amarillo
+          </button>
+          <button id="color-purple" class="bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+            Púrpura
+          </button>
+        </div>
+      </div>
+
+      <!-- MicroSD File Viewer -->
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <h2 class="text-lg font-semibold text-gray-900">Archivos MicroSD</h2>
+            <div id="sd-indicator" class="w-3 h-3 bg-gray-400 rounded-full"></div>
+          </div>
+          <button id="list-files-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm transition-colors">
+            Actualizar
+          </button>
+        </div>
+
+        <!-- SD Status -->
+        <div id="sd-status" class="mb-4 text-sm text-gray-600">
+          Estado: No conectado
+        </div>
+
+        <!-- Files List -->
+        <div id="files-list" class="space-y-2 max-h-60 overflow-y-auto">
+          <div class="text-gray-500 text-center py-8">
+            <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p>Conecta el dispositivo para ver archivos</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blink Control (Hidden for simple interface) -->
+    <div class="hidden mt-6 bg-white rounded-lg shadow-sm p-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">Control GPIO1 Blink</h2>
+      
+      <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-2">
+          <div id="blink-indicator" class="w-4 h-4 bg-gray-400 rounded-full"></div>
+          <span id="blink-status" class="text-sm text-gray-600">Desactivado</span>
+        </div>
+        
+        <div class="flex space-x-2">
+          <button id="blink-on-btn" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors">
+            Activar
+          </button>
+          <button id="blink-off-btn" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition-colors">
+            Desactivar
+          </button>
+        </div>
+        
+        <div class="flex items-center space-x-2">
+          <label class="text-sm text-gray-700">Velocidad:</label>
+          <input type="range" id="blink-speed" min="100" max="2000" value="500" class="w-20">
+          <span id="speed-value" class="text-sm text-gray-600">500ms</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="mt-6 bg-white rounded-lg shadow-sm p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Log de Actividad</h2>
+        <button id="clear-log-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm transition-colors">
+          Limpiar
+        </button>
+      </div>
+      
+      <div id="log-content" class="bg-gray-50 rounded p-4 h-40 overflow-y-auto text-sm font-mono">
+        <!-- Log entries will appear here -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div class="text-center text-gray-600 text-sm">
+        <p>&copy; 2024 UNIT Electronics - Pulsar H2 MicroSD Viewer</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="script-pulsar.js"></script>
+  
+  <!-- Collapsible Menu Script -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Toggle functionality for collapsible configuration section
+      const configToggle = document.getElementById('config-toggle');
+      const configContent = document.getElementById('config-content');
+      const configChevron = document.getElementById('config-chevron');
+      const autoReconnectToggle = document.getElementById('auto-reconnect-toggle');
+      const autoReconnectIndicator = document.getElementById('auto-reconnect-indicator');
+      
+      // Toggle config section
+      configToggle.addEventListener('click', function() {
+        if (configContent.style.display === 'none') {
+          configContent.style.display = 'block';
+          configChevron.style.transform = 'rotate(180deg)';
+        } else {
+          configContent.style.display = 'none';
+          configChevron.style.transform = 'rotate(0deg)';
+        }
+      });
+      
+      // Update auto-reconnect indicator
+      function updateAutoReconnectIndicator() {
+        if (autoReconnectToggle.checked) {
+          autoReconnectIndicator.className = 'w-2 h-2 bg-green-500 rounded-full';
+        } else {
+          autoReconnectIndicator.className = 'w-2 h-2 bg-gray-400 rounded-full';
+        }
+      }
+      
+      // Listen for auto-reconnect toggle changes
+      if (autoReconnectToggle) {
+        autoReconnectToggle.addEventListener('change', updateAutoReconnectIndicator);
+        updateAutoReconnectIndicator(); // Initial state
+      }
+      
+      // Auto-collapse on mobile after connection
+      function autoCollapseOnMobile() {
+        if (window.innerWidth < 768) {
+          const connectionStatus = document.getElementById('connection-status');
+          if (connectionStatus && connectionStatus.textContent.includes('Conectado')) {
+            configContent.style.display = 'none';
+            configChevron.style.transform = 'rotate(0deg)';
+          }
+        }
+      }
+      
+      // Check for mobile optimization
+      window.addEventListener('resize', autoCollapseOnMobile);
+      
+      // Initialize hardware status
+      initializeHardwareStatus();
+    });
+    
+    // Hardware Status Management
+    function initializeHardwareStatus() {
+      updateHardwareStatus('spi', 'unknown');
+      updateHardwareStatus('i2c', 'unknown');
+      updateHardwareStatus('neo', 'unknown');
+      updateHardwareStatus('adc1', 'unknown');
+      updateHardwareStatus('adc2', 'unknown');
+      updateHardwareStatus('gpio9', 'unknown');
+    }
+    
+    function updateHardwareStatus(component, status) {
+      const indicator = document.getElementById(`${component}-indicator`);
+      const statusText = document.getElementById(`${component === 'gpio9' ? 'gpio9-hw-status' : component + '-status'}`);
+      
+      if (!indicator || !statusText) return;
+      
+      // Update indicator color and status text
+      switch(status) {
+        case 'ok':
+          indicator.className = 'w-2 h-2 bg-green-500 rounded-full';
+          statusText.textContent = 'OK';
+          statusText.className = 'font-medium text-green-600';
+          break;
+        case 'error':
+          indicator.className = 'w-2 h-2 bg-red-500 rounded-full';
+          statusText.textContent = 'ERR';
+          statusText.className = 'font-medium text-red-600';
+          break;
+        case 'warning':
+          indicator.className = 'w-2 h-2 bg-yellow-500 rounded-full';
+          statusText.textContent = 'WARN';
+          statusText.className = 'font-medium text-yellow-600';
+          break;
+        default:
+          indicator.className = 'w-2 h-2 bg-gray-400 rounded-full';
+          statusText.textContent = '--';
+          statusText.className = 'font-medium text-gray-500';
+      }
+    }
+    
+    // Function to update all hardware status from sensor data
+    function updateHardwareFromSensorData(sensorData) {
+      try {
+        // Parse sensor data (format: "a2:1.234,a3:2.345,oled:OK")
+        const parts = sensorData.split(',');
+        let hasAdc1 = false, hasAdc2 = false, hasOled = false;
+        
+        parts.forEach(part => {
+          const [key, value] = part.split(':');
+          
+          switch(key.trim()) {
+            case 'a2':
+              hasAdc1 = !isNaN(parseFloat(value));
+              updateHardwareStatus('adc1', hasAdc1 ? 'ok' : 'error');
+              break;
+            case 'a3':
+              hasAdc2 = !isNaN(parseFloat(value));
+              updateHardwareStatus('adc2', hasAdc2 ? 'ok' : 'error');
+              break;
+            case 'oled':
+              hasOled = value.trim() === 'OK';
+              updateHardwareStatus('i2c', hasOled ? 'ok' : 'error');
+              break;
+          }
+        });
+        
+      } catch (error) {
+        console.warn('Error parsing sensor data for hardware status:', error);
+      }
+    }
+    
+    // Function to be called when SD files are successfully listed
+    function updateSDStatus(success) {
+      updateHardwareStatus('spi', success ? 'ok' : 'error');
+    }
+    
+    // Function to be called when NeoPixel is controlled
+    function updateNeoPixelStatus(success) {
+      updateHardwareStatus('neo', success ? 'ok' : 'error');
+    }
+    
+    // Function to be called when GPIO9 is read
+    function updateGPIOStatus(success) {
+      updateHardwareStatus('gpio9', success ? 'ok' : 'error');
+    }
+    
+    // Export functions for use by script-pulsar.js
+    window.updateHardwareStatus = updateHardwareStatus;
+    window.updateHardwareFromSensorData = updateHardwareFromSensorData;
+    window.updateSDStatus = updateSDStatus;
+    window.updateNeoPixelStatus = updateNeoPixelStatus;
+    window.updateGPIOStatus = updateGPIOStatus;
+    
+    // Demo function - simulate hardware status updates
+    function simulateHardwareUpdates() {
+      setTimeout(() => {
+        updateHardwareStatus('neo', 'ok');
+        updateHardwareStatus('adc1', 'ok');
+        updateHardwareStatus('adc2', 'ok');
+      }, 2000);
+      
+      setTimeout(() => {
+        updateHardwareStatus('spi', 'ok');
+        updateHardwareStatus('i2c', 'ok');
+        updateHardwareStatus('gpio9', 'ok');
+      }, 4000);
+    }
+    
+    // Uncomment to test hardware status simulation
+    // simulateHardwareUpdates();
+  </script>
+
+  <!-- Verification Script -->
+  <script>
+    // Verificar soporte Web Bluetooth
+    if (!navigator.bluetooth) {
+      document.body.innerHTML = `
+        <div class="min-h-screen flex items-center justify-center bg-gray-100">
+          <div class="text-center">
+            <h1 class="text-2xl font-bold text-gray-900 mb-4">Web Bluetooth no soportado</h1>
+            <p class="text-gray-600">Este navegador no soporta Web Bluetooth API.</p>
+            <p class="text-gray-600 mt-2">Usa Chrome, Edge o un navegador compatible.</p>
+          </div>
+        </div>
+      `;
+    }
+  </script>
+
+</body>
+</html>
