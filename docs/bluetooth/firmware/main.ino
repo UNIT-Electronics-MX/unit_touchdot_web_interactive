@@ -79,6 +79,7 @@ unsigned long lastSensorRead = 0;
 unsigned long lastDisplayUpdate = 0;
 const unsigned long SENSOR_INTERVAL = 1000; // Leer sensores cada 1 segundo
 const unsigned long DISPLAY_INTERVAL = 500; // Actualizar display cada 500ms
+bool deviceInfoSent = false; // Flag para enviar Device Info solo una vez al conectar
 // ========================================
 // DECLARACIONES ADELANTADAS
 // ========================================
@@ -97,15 +98,33 @@ unsigned long lastOledCheck = 0;
 const unsigned long OLED_CHECK_INTERVAL = 5000; // Verificar OLED cada 5 segundos
 
 // ========================================
+// FORWARD DECLARATIONS
+// ========================================
+String getDeviceInfo();
+
+// ========================================
 // CALLBACKS BLE
 // ========================================
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
+      deviceInfoSent = false; // Reset flag al conectar
       Serial.println("Cliente conectado");
       
       // *** ENVIAR ESTADO INICIAL AL CONECTAR ***
       delay(1000); // Dar tiempo para que el cliente configure notificaciones
+      
+      // Enviar información del dispositivo via característica Sensor
+      if (pSensorCharacteristic) {
+        String deviceInfo = getDeviceInfo();
+        // Formato: DEVICE_INFO:{json}
+        String infoMessage = "DEVICE_INFO:" + deviceInfo;
+        pSensorCharacteristic->setValue(infoMessage.c_str());
+        pSensorCharacteristic->notify();
+        deviceInfoSent = true;
+        Serial.println("📱 Información del dispositivo enviada:");
+        Serial.println(deviceInfo);
+      }
       
       // Enviar estado actual de GPIO9
       if (pGpioCharacteristic) {
@@ -114,6 +133,9 @@ class MyServerCallbacks: public BLEServerCallbacks {
         pGpioCharacteristic->notify();
         Serial.printf("🔧 Estado inicial GPIO9 enviado: %s\n", currentGpioState.c_str());
       }
+      
+      // Pequeña pausa antes de enviar datos de sensores
+      delay(500);
       
       // Enviar estado inicial de sensores
       if (pSensorCharacteristic) {
@@ -131,6 +153,7 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
     void onDisconnect(BLEServer* pServer) {
       deviceConnected = false;
+      deviceInfoSent = false; // Reset flag al desconectar
       Serial.println("Cliente desconectado");
     }
 };
@@ -176,6 +199,46 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 void ledColor(uint8_t r, uint8_t g, uint8_t b) {
   strip.setPixelColor(0, strip.Color(r, g, b));
   strip.show();
+}
+
+// Función para obtener información del dispositivo
+String getDeviceInfo() {
+  // Obtener MAC Address (para ESP32-H2 usamos la MAC de la EFUSE)
+  uint64_t efuseMac = ESP.getEfuseMac();
+  char macStr[18];
+  sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X",
+          (uint8_t)(efuseMac >> 0), (uint8_t)(efuseMac >> 8),
+          (uint8_t)(efuseMac >> 16), (uint8_t)(efuseMac >> 24),
+          (uint8_t)(efuseMac >> 32), (uint8_t)(efuseMac >> 40));
+  String macAddress = String(macStr);
+  
+  // Obtener Chip ID (único para cada ESP32)
+  uint64_t chipID = ESP.getEfuseMac();
+  
+  // Convertir Chip ID a string hexadecimal
+  char chipIDStr[17];
+  sprintf(chipIDStr, "%04X%08X", (uint16_t)(chipID >> 32), (uint32_t)chipID);
+  
+  // Obtener información adicional
+  String chipModel = ESP.getChipModel();
+  uint8_t chipRevision = ESP.getChipRevision();
+  uint32_t chipCores = ESP.getChipCores();
+  uint32_t flashSize = ESP.getFlashChipSize();
+  
+  // Crear JSON con toda la información
+  String deviceInfo = "{"
+    "\"mac\":\"" + macAddress + "\","
+    "\"chipID\":\"" + String(chipIDStr) + "\","
+    "\"model\":\"" + chipModel + "\","
+    "\"revision\":" + String(chipRevision) + ","
+    "\"cores\":" + String(chipCores) + ","
+    "\"flashSize\":" + String(flashSize) + ","
+    "\"deviceName\":\"Pulsar_H2\","
+    "\"firmware\":\"1.0.0\","
+    "\"timestamp\":" + String(millis()) +
+  "}";
+  
+  return deviceInfo;
 }
 
 // Función para verificar si la OLED está conectada
@@ -667,11 +730,11 @@ void setupBLE() {
                    );
   pSdCharacteristic->setCallbacks(new MyCallbacks());
 
-  // Agregar descriptores BLE2902 solo para las características que los necesitan
-  // ESP32-H2 puede tener limitaciones con múltiples descriptores
-  pSdCharacteristic->addDescriptor(new BLE2902());
-  pSensorCharacteristic->addDescriptor(new BLE2902());
-  pGpioCharacteristic->addDescriptor(new BLE2902());
+  // Agregar descriptores BLE2902 solo para las características críticas
+  // ESP32-H2 tiene limitaciones: máximo 4 características activas
+  // Priorizamos las notificaciones más importantes
+  pSensorCharacteristic->addDescriptor(new BLE2902());  // Crítico: lecturas continuas + device info
+  pGpioCharacteristic->addDescriptor(new BLE2902());    // Crítico: cambios de estado
 
   // Inicializar valores con estado real del GPIO9
   pNeopixelCharacteristic->setValue("0,255,0");
@@ -683,6 +746,8 @@ void setupBLE() {
   Serial.printf("🔧 BLE GPIO característica inicializada con: %s\n", initialGpioValue.c_str());
   
   pSdCharacteristic->setValue(sdCardOK ? "OK" : "ERROR");
+  
+  Serial.println("🔧 Device Info se enviará via característica Sensor al conectar");
 
   // Iniciar servicio
   pService->start();

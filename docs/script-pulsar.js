@@ -17,7 +17,7 @@
 // ========================================
 const SERVICE_UUID = '12345678-1234-1234-1234-1234567890ab';           // Servicio principal
 const NEOPIXEL_CHARACTERISTIC_UUID = '12345678-1234-1234-1234-1234567890ac'; // Control NeoPixel (Write)
-const SENSOR_CHARACTERISTIC_UUID = '12345678-1234-1234-1234-1234567890ad'; // ADC Sensores (Read/Notify)
+const SENSOR_CHARACTERISTIC_UUID = '12345678-1234-1234-1234-1234567890ad'; // ADC Sensores (Read/Notify) + Device Info al conectar
 const GPIO_CHARACTERISTIC_UUID = '12345678-1234-1234-1234-1234567890ae';  // GPIO9 (Notify)
 const SD_CHARACTERISTIC_UUID = '12345678-1234-1234-1234-1234567890af';    // MicroSD (Write/Read)
 const BLINK_CHARACTERISTIC_UUID = '12345678-1234-1234-1234-1234567890b0';  // GPIO1 Blink (Write/Read/Notify)
@@ -513,6 +513,20 @@ async function connectToBluetoothDevice() {
 
         addLog('Obteniendo servicio BLE...', 'bluetooth');
         bluetoothService = await bluetoothServer.getPrimaryService(SERVICE_UUID);
+        
+        // Debug: Listar todas las características disponibles
+        console.log('🔍 === DIAGNÓSTICO DE CARACTERÍSTICAS BLE ===');
+        console.log('🔍 Servicio UUID:', bluetoothService.uuid);
+        try {
+            const characteristics = await bluetoothService.getCharacteristics();
+            console.log('🔍 Total de características encontradas:', characteristics.length);
+            characteristics.forEach((char, index) => {
+                console.log(`🔍 Característica ${index + 1}:`, char.uuid);
+            });
+        } catch (diagErr) {
+            console.warn('⚠️ No se pudo obtener lista de características:', diagErr);
+        }
+        console.log('🔍 === FIN DIAGNÓSTICO ===');
 
         // Obtener características
         try {
@@ -598,6 +612,12 @@ async function connectToBluetoothDevice() {
             addLog('❌ Característica SD no disponible: ' + err.message, 'warning');
             console.error('Error configurando SD characteristic:', err);
         }
+
+        // ⚠️ NOTA: Device Info se recibe automáticamente via característica Sensor al conectar
+        // El firmware envía primero DEVICE_INFO:{json}, luego datos normales de sensores
+        // Esto soluciona la limitación del ESP32-H2 (máximo 4 características BLE activas)
+        addLog('⏳ Esperando información del dispositivo via Sensor...', 'info');
+        console.log('🔍 Device Info se recibirá automáticamente via SENSOR_CHARACTERISTIC');
 
         // Configurar característica Blink GPIO1
         try {
@@ -786,7 +806,30 @@ async function readSensors() {
 
 function handleSensorNotification(event) {
     const sensorData = new TextDecoder().decode(event.target.value);
-    parseSensorData(sensorData);
+    
+    // Verificar si es información del dispositivo
+    if (sensorData.startsWith('DEVICE_INFO:')) {
+        const deviceInfoJson = sensorData.substring(12); // Quitar el prefijo "DEVICE_INFO:"
+        parseDeviceInfo(deviceInfoJson);
+    } else {
+        // Es un mensaje normal de sensores
+        parseSensorData(sensorData);
+    }
+}
+
+function parseDeviceInfo(jsonString) {
+    try {
+        const deviceInfo = JSON.parse(jsonString);
+        console.log('📱 Información del dispositivo recibida:', deviceInfo);
+        
+        // Mostrar la información en la interfaz
+        displayDeviceInfo(deviceInfo);
+        
+        addLog(`Dispositivo identificado: ${deviceInfo.deviceName} (${deviceInfo.mac})`, 'success');
+    } catch (error) {
+        console.error('❌ Error parseando Device Info:', error);
+        addLog('Error al procesar información del dispositivo', 'error');
+    }
 }
 
 function parseSensorData(dataString) {
@@ -1361,6 +1404,102 @@ async function sendBlinkCommand(command) {
     } catch (error) {
         addLog(`❌ Error enviando comando blink: ${error}`, 'error');
     }
+}
+
+// ========================================
+// DEVICE INFO FUNCTIONS
+// ========================================
+function handleDeviceInfoNotification(event) {
+    const deviceInfoText = new TextDecoder().decode(event.target.value);
+    displayDeviceInfo(deviceInfoText);
+    addLog(`📱 Información del dispositivo actualizada`, 'info');
+}
+
+function displayDeviceInfo(deviceInfoJson) {
+    try {
+        const deviceInfo = JSON.parse(deviceInfoJson);
+        
+        // Crear o actualizar el panel de información del dispositivo
+        let deviceInfoPanel = document.getElementById('device-info-panel');
+        if (!deviceInfoPanel) {
+            // Crear el panel si no existe
+            deviceInfoPanel = document.createElement('div');
+            deviceInfoPanel.id = 'device-info-panel';
+            deviceInfoPanel.className = 'bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg mb-4';
+            
+            // Agregar después del título principal
+            const mainTitle = document.querySelector('h1');
+            if (mainTitle && mainTitle.parentNode) {
+                mainTitle.parentNode.insertBefore(deviceInfoPanel, mainTitle.nextSibling);
+            }
+        }
+        
+        // Actualizar contenido del panel
+        deviceInfoPanel.innerHTML = `
+            <div class="flex items-center mb-2">
+                <div class="w-3 h-3 bg-blue-400 rounded-full mr-2"></div>
+                <h3 class="text-lg font-semibold text-blue-800">Información del Dispositivo</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div class="space-y-1">
+                    <div><span class="font-medium text-gray-700">Dispositivo:</span> <span class="text-blue-700">${deviceInfo.deviceName || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">MAC Address:</span> <span class="font-mono text-green-700">${deviceInfo.mac || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">Chip ID:</span> <span class="font-mono text-purple-700">${deviceInfo.chipId || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">Modelo:</span> <span class="text-gray-700">${deviceInfo.chipModel || 'N/A'}</span></div>
+                </div>
+                <div class="space-y-1">
+                    <div><span class="font-medium text-gray-700">Revisión:</span> <span class="text-gray-700">${deviceInfo.chipRevision || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">Cores:</span> <span class="text-gray-700">${deviceInfo.cpuCores || 'N/A'}</span></div>
+                    <div><span class="font-medium text-gray-700">Flash:</span> <span class="text-gray-700">${deviceInfo.flashSize || 'N/A'} MB</span></div>
+                    <div><span class="font-medium text-gray-700">Firmware:</span> <span class="text-gray-700">v${deviceInfo.firmwareVersion || 'N/A'}</span></div>
+                </div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500">
+                Última actualización: ${deviceInfo.timestamp || new Date().toLocaleString()}
+            </div>
+        `;
+        
+        addLog(`📱 Dispositivo: ${deviceInfo.deviceName} | MAC: ${deviceInfo.mac}`, 'success');
+        
+    } catch (error) {
+        console.error('Error parsing device info:', error);
+        addLog('⚠️ Error procesando información del dispositivo', 'warning');
+    }
+}
+
+function displayDeviceInfoUnavailable() {
+    // Crear panel informativo cuando la característica no está disponible
+    let deviceInfoPanel = document.getElementById('device-info-panel');
+    if (!deviceInfoPanel) {
+        deviceInfoPanel = document.createElement('div');
+        deviceInfoPanel.id = 'device-info-panel';
+        deviceInfoPanel.className = 'bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg mb-4';
+        
+        // Agregar después del título principal
+        const mainTitle = document.querySelector('h1');
+        if (mainTitle && mainTitle.parentNode) {
+            mainTitle.parentNode.insertBefore(deviceInfoPanel, mainTitle.nextSibling);
+        }
+    }
+    
+    // Mostrar mensaje informativo
+    deviceInfoPanel.innerHTML = `
+        <div class="flex items-center mb-2">
+            <div class="w-3 h-3 bg-yellow-400 rounded-full mr-2"></div>
+            <h3 class="text-lg font-semibold text-yellow-800">Información del Dispositivo</h3>
+        </div>
+        <div class="text-sm text-yellow-700">
+            <div class="mb-2">
+                <span class="font-medium">⚠️ Característica no disponible</span>
+            </div>
+            <div class="mb-2">
+                Para ver la información completa del dispositivo (MAC, Chip ID, etc.), necesitas actualizar el firmware con la versión más reciente.
+            </div>
+            <div class="text-xs bg-yellow-100 p-2 rounded mt-2">
+                <strong>Ubicación del firmware:</strong> <code>/docs/bluetooth/firmware/main.ino</code>
+            </div>
+        </div>
+    `;
 }
 
 // ========================================
