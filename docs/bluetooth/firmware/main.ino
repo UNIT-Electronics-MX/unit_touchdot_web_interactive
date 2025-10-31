@@ -790,6 +790,18 @@ void loop() {
 
   // Enviar datos via BLE si está conectado
   if (deviceConnected && millis() - lastSensorRead > SENSOR_INTERVAL) {
+    // Si aún no se ha confirmado el envío de Device Info, reenviarlo cada 5 segundos
+    static unsigned long lastDeviceInfoRetry = 0;
+    if (!deviceInfoSent || (millis() - lastDeviceInfoRetry > 5000)) {
+      String deviceInfo = getDeviceInfo();
+      String infoMessage = "DEVICE_INFO:" + deviceInfo;
+      pSensorCharacteristic->setValue(infoMessage.c_str());
+      pSensorCharacteristic->notify();
+      lastDeviceInfoRetry = millis();
+      Serial.println("🔄 Reenviando Device Info...");
+      delay(200); // Pausa para que se procese
+    }
+    
     // Enviar datos de sensores ADC + estado OLED
     String sensorData = "a2:" + String(voltage_A2, 3) + ",a3:" + String(voltage_A3, 3) + ",oled:" + (oledOK ? "OK" : "ERR");
     pSensorCharacteristic->setValue(sensorData.c_str());
